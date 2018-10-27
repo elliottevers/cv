@@ -1,5 +1,6 @@
 import numpy as np
 from random import shuffle
+from past.builtins import xrange
 
 def softmax_loss_naive(W, X, y, reg):
   """
@@ -29,7 +30,40 @@ def softmax_loss_naive(W, X, y, reg):
   # here, it is easy to run into numeric instability. Don't forget the        #
   # regularization!                                                           #
   #############################################################################
-  pass
+    
+  num_classes = W.shape[1]
+  num_train = X.shape[0]
+
+  for i in xrange(num_train):
+
+      scores = X[i].dot(W)
+ 
+      scores = scores - scores.max()
+    
+      normalization_factor = np.sum(np.exp(scores))
+        
+      score_unnormalized= np.exp(scores[y[i]])
+
+      loss += -1 * np.log(
+          score_unnormalized / normalization_factor
+      )
+
+      # differentiate cost with respect to weights
+      dW[:, y[i]] += -1 * (normalization_factor - score_unnormalized) / normalization_factor * X[i]
+    
+      for j in xrange(num_classes):
+
+          if j == y[i]:
+              continue
+   
+          dW[:, j] += np.exp(scores[j]) / normalization_factor * X[i]
+
+  loss /= num_train
+  loss += reg * np.sum(W**2)
+
+  dW /= num_train
+  dW += 2 * reg * W
+    
   #############################################################################
   #                          END OF YOUR CODE                                 #
   #############################################################################
@@ -53,7 +87,42 @@ def softmax_loss_vectorized(W, X, y, reg):
   # here, it is easy to run into numeric instability. Don't forget the        #
   # regularization!                                                           #
   #############################################################################
-  pass
+  num_classes = W.shape[1]
+
+  num_train = X.shape[0]
+    
+  scores = X.dot(W)
+
+  scores = scores - scores.max()
+    
+  scores_unnormalized = np.exp(scores)
+
+  normalization_factor = np.sum(
+      scores_unnormalized,
+      axis=1
+  )
+    
+  score_unnormalized = scores_unnormalized[range(num_train), y]
+
+  loss_unnormalized = -1 * np.sum(np.log(score_unnormalized / normalization_factor))
+    
+  reg_term = reg * np.sum(W**2)
+
+  loss = loss_unnormalized/num_train + reg_term
+
+  s = np.divide(
+      scores_unnormalized,
+      normalization_factor.reshape(
+          num_train,
+          1
+      )
+  )
+
+  s[range(num_train), y] = - (normalization_factor - score_unnormalized) / normalization_factor
+    
+  dW = X.T.dot(s)
+  dW /= num_train
+  dW += 2 * reg * W
   #############################################################################
   #                          END OF YOUR CODE                                 #
   #############################################################################
