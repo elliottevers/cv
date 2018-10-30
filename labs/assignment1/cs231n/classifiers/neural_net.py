@@ -39,6 +39,9 @@ class TwoLayerNet(object):
     self.params['b1'] = np.zeros(hidden_size)
     self.params['W2'] = std * np.random.randn(hidden_size, output_size)
     self.params['b2'] = np.zeros(output_size)
+    self.input_size = input_size
+    self.hidden_size = hidden_size
+    self.output_size = output_size
 
   def loss(self, X, y=None, reg=0.0):
     """
@@ -67,7 +70,6 @@ class TwoLayerNet(object):
     W1, b1 = self.params['W1'], self.params['b1']
     W2, b2 = self.params['W2'], self.params['b2']
     N, D = X.shape
-    num_classes = 3
 
     # Compute the forward pass
     scores = None
@@ -145,7 +147,7 @@ class TwoLayerNet(object):
     a2 = softmax(z2)
     
     correct_probs = np.zeros(
-        (X.shape[0], num_classes)
+        (X.shape[0], self.output_size)
     )
     
     correct_probs[np.arange(y.shape[0]), y] = 1
@@ -192,7 +194,7 @@ class TwoLayerNet(object):
     
     predicted = a2
     
-    targets = np.zeros((num_train, num_classes))
+    targets = np.zeros((num_train, self.output_size))
     targets[np.arange(N),y] = 1 # full mass at gt values
     
     # derivative of loss with respect to score
@@ -285,6 +287,10 @@ class TwoLayerNet(object):
       # them in X_batch and y_batch respectively.                             #
       #########################################################################
       # randomize indices
+    
+      batch_ind = np.random.choice(num_train, batch_size)
+      X_batch = X[batch_ind]
+      y_batch = y[batch_ind]
 
       #########################################################################
       #                             END OF YOUR CODE                          #
@@ -300,7 +306,13 @@ class TwoLayerNet(object):
       # using stochastic gradient descent. You'll need to use the gradients   #
       # stored in the grads dictionary defined above.                         #
       #########################################################################
-
+      
+#       import ipdb; ipdb.set_trace()
+      self.params['W1'] -= learning_rate * grads['W1']
+      self.params['W2'] -= learning_rate * grads['W2']
+      self.params['b1'] -= learning_rate * grads['b1'].reshape(self.hidden_size,)
+      self.params['b2'] -= learning_rate * grads['b2'].reshape(self.output_size,)
+    
       #########################################################################
       #                             END OF YOUR CODE                          #
       #########################################################################
@@ -346,6 +358,59 @@ class TwoLayerNet(object):
     # TODO: Implement this function; it should be VERY simple!                #
     ###########################################################################
 
+    def relu(signal):
+        return np.maximum(0, signal)
+    
+    def softmax(scores):
+        # for numeric stability, shift the values of scores so that the max is 0
+        scores -= scores.max()
+    
+        unnormalized_scores = np.exp(scores)
+
+        normalization_factor = np.sum(unnormalized_scores, axis=1).reshape(-1, 1)
+    
+        return unnormalized_scores/normalization_factor
+    
+    
+    def z(weights, activations, bias):
+        return np.dot(activations, weights) + bias
+        
+    def regularization(reg_strength, W1, W2):
+        return reg_strength * (np.sum(W1**2) + np.sum(W2**2))
+    
+    
+    def cross_entropy(correct, predicted):
+        
+        products = correct * np.log(
+            predicted
+        )
+        
+        return -1 * np.sum(
+            products,
+            axis=1
+        )
+    
+    
+    z1 = z(
+        self.params['W1'],
+        X,
+        self.params['b1']
+    )
+    
+    a1 = relu(z1)
+    
+    z2 = z(
+        self.params['W2'],
+        a1,
+        self.params['b2']
+    )
+    
+    a2 = softmax(z2)
+    
+    y_pred = np.argmax(
+        a2,
+        axis=1
+    )
     ###########################################################################
     #                              END OF YOUR CODE                           #
     ###########################################################################
