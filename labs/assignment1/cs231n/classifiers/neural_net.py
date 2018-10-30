@@ -67,6 +67,7 @@ class TwoLayerNet(object):
     W1, b1 = self.params['W1'], self.params['b1']
     W2, b2 = self.params['W2'], self.params['b2']
     N, D = X.shape
+    num_classes = 3
 
     # Compute the forward pass
     scores = None
@@ -75,7 +76,54 @@ class TwoLayerNet(object):
     # Store the result in the scores variable, which should be an array of      #
     # shape (N, C).                                                             #
     #############################################################################
-    pass
+    
+    
+    def relu(signal):
+        return np.maximum(0, signal)
+    
+    def softmax(scores):
+        # for numeric stability, shift the values of scores so that the max is 0
+        scores -= scores.max()
+    
+        unnormalized_scores = np.exp(scores)
+
+        normalization_factor = np.sum(unnormalized_scores, axis=1).reshape(-1, 1)
+    
+        return unnormalized_scores/normalization_factor
+    
+    
+    def z(weights, activations, bias):
+        return np.dot(activations, weights) + bias
+        
+    def regularization(reg_strength, W1, W2):
+        return reg_strength * (np.sum(W1**2) + np.sum(W2**2))
+    
+    
+    def cross_entropy(correct, predicted):
+        
+        products = correct * np.log(
+            predicted
+        )
+        
+        return -1 * np.sum(
+            products,
+            axis=1
+        )
+    
+    
+    w1 = np.copy(W1)
+    
+    w2 = np.copy(W2)
+    
+    z1 = z(w1, X, b1)
+    
+    a1 = relu(z1)
+    
+    z2 = z(w2, a1, b2)
+    
+    scores = z2    
+   
+    
     #############################################################################
     #                              END OF YOUR CODE                             #
     #############################################################################
@@ -92,7 +140,28 @@ class TwoLayerNet(object):
     # in the variable loss, which should be a scalar. Use the Softmax           #
     # classifier loss.                                                          #
     #############################################################################
-    pass
+    num_train = X.shape[0]
+    
+    a2 = softmax(z2)
+    
+    correct_probs = np.zeros(
+        (X.shape[0], num_classes)
+    )
+    
+    correct_probs[np.arange(y.shape[0]), y] = 1
+
+    loss = np.mean(
+        cross_entropy(
+            correct_probs, # correct
+            a2 # predicted
+        )
+    ) + regularization(
+        reg,
+        w1,
+        w2
+    )
+    
+    
     #############################################################################
     #                              END OF YOUR CODE                             #
     #############################################################################
@@ -104,7 +173,74 @@ class TwoLayerNet(object):
     # and biases. Store the results in the grads dictionary. For example,       #
     # grads['W1'] should store the gradient on W1, and be a matrix of same size #
     #############################################################################
-    pass
+    
+        
+    ### useful derivatives
+    d_z2_d_a1 = lambda w2, a1, b2: w2
+        
+    # derivative of relu
+    d_a1_d_z1 = np.vectorize(
+        lambda z1: 1 if z1 >= 0 else 0
+    )
+
+    d_z1_d_w1 = lambda w1, x, b1: x
+    
+    d_z2_d_w2 = lambda w2, a1, b2: a1
+    
+
+   
+    
+    predicted = a2
+    
+    targets = np.zeros((num_train, num_classes))
+    targets[np.arange(N),y] = 1 # full mass at gt values
+    
+    # derivative of loss with respect to score
+    # https://www.ics.uci.edu/~pjsadows/notes.pdf
+    grad_z2 = predicted - targets
+    
+    # use average of gradient in backprop
+    grad_z2 /= num_train
+
+    
+    # should be 3 x 10
+    grads['W2'] = np.matmul(
+        d_z2_d_w2(w2, a1, b2).T, # therefore, 10 x 5
+        grad_z2 # should be 3 x 5
+    )
+    
+    grads['b2'] = np.sum(
+        grad_z2,
+        axis=0,
+        keepdims=True
+    )
+       
+
+    # should be 10 x 5
+    grad_a1 = np.matmul(
+        d_z2_d_a1(w2, a1, b2), # should be 10 x 3
+        grad_z2.T # should be 3 x 5
+    )
+    
+
+    grad_z1 = d_a1_d_z1(z1) * grad_a1.T
+   
+    
+    # should be 10 x 4
+    grads['W1'] = np.matmul(
+        d_z1_d_w1(w1, X, b1).T, # 5 x 4
+        grad_z1 # should be 10 x 5
+    )
+    
+    grads['b1'] = np.sum(
+        grad_z1,
+        axis=0,
+        keepdims=True
+    )
+
+    grads['W1'] += 2*reg*W1
+    grads['W2'] += 2*reg*W2
+
     #############################################################################
     #                              END OF YOUR CODE                             #
     #############################################################################
@@ -148,7 +284,8 @@ class TwoLayerNet(object):
       # TODO: Create a random minibatch of training data and labels, storing  #
       # them in X_batch and y_batch respectively.                             #
       #########################################################################
-      pass
+      # randomize indices
+
       #########################################################################
       #                             END OF YOUR CODE                          #
       #########################################################################
@@ -163,7 +300,7 @@ class TwoLayerNet(object):
       # using stochastic gradient descent. You'll need to use the gradients   #
       # stored in the grads dictionary defined above.                         #
       #########################################################################
-      pass
+
       #########################################################################
       #                             END OF YOUR CODE                          #
       #########################################################################
@@ -208,7 +345,7 @@ class TwoLayerNet(object):
     ###########################################################################
     # TODO: Implement this function; it should be VERY simple!                #
     ###########################################################################
-    pass
+
     ###########################################################################
     #                              END OF YOUR CODE                           #
     ###########################################################################
