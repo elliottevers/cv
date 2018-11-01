@@ -325,7 +325,7 @@ class FullyConnectedNet(object):
             return out3, cache
 
         for i in range(1, self.num_layers):
-            
+                
             if self.use_batchnorm:
                 scores, cache = affine_bn_relu_forward(
                     scores,
@@ -351,7 +351,11 @@ class FullyConnectedNet(object):
                 )
                 
             caches.append(cache)
-        
+
+            if self.use_dropout:
+                scores, cache = dropout_forward(scores, self.dropout_param)
+                caches.append(cache)
+                        
         index_last_layer = self.num_layers
         
         scores, cache = affine_forward(
@@ -399,11 +403,12 @@ class FullyConnectedNet(object):
         loss, dout = softmax_loss(scores, y)
                 
         loss += reg
-                
+        
         dout, grads['W{i}'.format(i=index_last_layer)], grads['b{i}'.format(i=index_last_layer)] = affine_backward(
             dout,
             caches.pop()
         )
+            
         grads['W{i}'.format(i=index_last_layer)] += self.reg * self.params['W{i}'.format(i=index_last_layer)]
                 
     
@@ -416,6 +421,9 @@ class FullyConnectedNet(object):
         
         for i in reversed(list(range(1, index_last_layer))):
             
+            if self.use_dropout:
+                dout = dropout_backward(dout, caches.pop())
+                
             if self.use_batchnorm:
                 dout, grads['W{i}'.format(i=i)], grads['b{i}'.format(i=i)], grads['gamma{i}'.format(i=i)], grads['beta{i}'.foramt(i=i)] = affine_bn_relu_backward(
                     dout,
