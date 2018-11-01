@@ -181,8 +181,26 @@ def batchnorm_forward(x, gamma, beta, bn_param):
         # with the momentum variable to update the running mean and running   #
         # variance, storing your result in the running_mean and running_var   #
         # variables.                                                          #
-        #######################################################################
-        import ipdb; ipdb.set_trace()
+        #######################################################################\
+        
+        mu = np.mean(x, axis=0)
+        
+        var = 1 / float(N) * np.sum(
+            (x - mu)**2,
+            axis=0
+        )
+        
+        x_hat = (x - mu) / np.sqrt(var + eps)
+        
+        y = gamma * x_hat + beta
+        
+        out = y
+
+        running_mean = momentum * running_mean + (1 - momentum) * mu
+        
+        running_var = momentum * running_var + (1 - momentum) * var
+
+        cache = (x_hat, mu, var, eps, gamma, beta, x)
 
         #######################################################################
         #                           END OF YOUR CODE                          #
@@ -194,7 +212,13 @@ def batchnorm_forward(x, gamma, beta, bn_param):
         # then scale and shift the normalized data using gamma and beta.      #
         # Store the result in the out variable.                               #
         #######################################################################
-        pass
+        
+        x_hat = (x - running_mean) / np.sqrt(running_var + eps)
+        
+        y = gamma * x_hat + beta
+        
+        out = y
+        
         #######################################################################
         #                          END OF YOUR CODE                           #
         #######################################################################
@@ -230,7 +254,43 @@ def batchnorm_backward(dout, cache):
     # TODO: Implement the backward pass for batch normalization. Store the    #
     # results in the dx, dgamma, and dbeta variables.                         #
     ###########################################################################
-    pass
+    
+    # TODO: make some lambda expressions representing the derivatives
+    
+#     d_multplicative_inverse = lambda x: 
+    
+    x_hat, mu, var, eps, gamma, beta, x = cache
+    
+    N, D = dout.shape
+
+    # derivative of 
+    dbeta = np.sum(dout, axis=0)
+    
+    dgamma = np.sum(dout * x_hat, axis=0)
+
+    dx_hat = dout * gamma
+    
+    #  dxmu1 = dx_hat * 1/den
+    dxmu1 = dx_hat * 1 / np.sqrt(var + eps)
+    
+    # divar = np.sum(dx_hat * num, axis=0)
+    divar = np.sum(dx_hat * (x - mu), axis=0)
+    
+    # dvar = divar * -1 / 2 * (var + eps) ** (-3/2)
+    dvar = divar * -1 / 2 * (var + eps) ** (-3/2)
+    
+    dsq = 1 / N * np.ones((N, D)) * dvar
+    
+    dxmu2 = 2 * (x - mu) * dsq
+    
+    dx1 = dxmu1 + dxmu2
+    
+    dmu = -1 * np.sum(dxmu1 + dxmu2, axis=0)
+    
+    dx2 = 1 / N * np.ones((N, D)) * dmu
+        
+    dx = dx1 + dx2
+    
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################

@@ -248,6 +248,10 @@ class FullyConnectedNet(object):
                 dimensions_layer[num_layer+1]
             )
            
+        if self.use_batchnorm:
+            for i in range(1, self.num_layers):
+                self.params['gamma{i}'.format(i=i)] = np.ones(dimensions_layer[i])
+                self.params['beta{i}'.format(i=i)] = np.zeros(dimensions_layer[i])
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
@@ -313,21 +317,38 @@ class FullyConnectedNet(object):
         
         caches = []
       
+        def affine_bn_relu_forward(x, w, b, gamma, beta, bn_param):
+            out1, fc_cache = affine_forward(x, w, b)
+            out2, bn_cache = batchnorm_forward(out1, gamma, beta, bn_param)
+            out3, relu_cache = relu_forward(out2)
+            cache = (fc_cache, bn_cache, relu_cache)
+            return out3, cache
+
         for i in range(1, self.num_layers):
             
-            scores, cache = affine_relu_forward(
-                scores,
-                self.params[
-                    'W{i}'.format(
-                        i=i
-                    )
-                ],
-                self.params[
-                    'b{i}'.format(
-                        i=i
-                    )
-                ]
-            )
+            if self.use_batchnorm:
+                scores, cache = affine_bn_relu_forward(
+                    scores,
+                    self.params['W{i}'.format(i=i)],
+                    self.params['b{i}'.format(i=i)],
+                    self.params['gamma{i}'.format(i=i)],
+                    self.params['beta{i}'.format(i=i)],
+                    self.bn_params[i - 1]
+                )
+            else:
+                scores, cache = affine_relu_forward(
+                    scores,
+                    self.params[
+                        'W{i}'.format(
+                            i=i
+                        )
+                    ],
+                    self.params[
+                        'b{i}'.format(
+                            i=i
+                        )
+                    ]
+                )
                 
             caches.append(cache)
         
@@ -379,21 +400,36 @@ class FullyConnectedNet(object):
                 
         loss += reg
                 
-        dout, grads['W%d' % (index_last_layer)], grads['b%d' % (index_last_layer)] = affine_backward(
+        dout, grads['W{i}'.format(i=index_last_layer)], grads['b{i}'.format(i=index_last_layer)] = affine_backward(
             dout,
             caches.pop()
         )
-        grads['W%d' % (index_last_layer)] += self.reg * self.params['W%d' % (index_last_layer)]
+        grads['W{i}'.format(i=index_last_layer)] += self.reg * self.params['W{i}'.format(i=index_last_layer)]
                 
     
+        def affine_bn_relu_backward(dout, cache):
+            fc_cache, bn_cache, relu_cache = cache
+            d1 = relu_backward(dout, relu_cache)
+            d2, dgamma, dbeta = batchnorm_backward(d1, bn_cache)
+            d3, dw, db = affine_backward(d2, fc_cache)
+            return d3, dw, db, dgamma, dbeta
+        
         for i in reversed(list(range(1, index_last_layer))):
             
-            dout, grads['W%d' % (i)], grads['b%d' % (i)] = affine_relu_backward(
-                dout,
-                caches.pop()
-            )
+            if self.use_batchnorm:
+                dout, grads['W{i}'.format(i=i)], grads['b{i}'.format(i=i)], grads['gamma{i}'.format(i=i)], grads['beta{i}'.foramt(i=i)] = affine_bn_relu_backward(
+                    dout,
+                    caches.pop()
+                )
+            else:
+                dout, grads['W{i}'.format(i=i)], grads['b{i}'.format(i=i)] = affine_relu_backward(
+                    dout,
+                    caches.pop()
+                )
                 
-            grads['W%d' % (i)] += self.reg * self.params['W%d' % (i)]
+
+                
+            grads['W{i}'.format(i=i)] += self.reg * self.params['W{i}'.format(i=i)]
             
             
         ############################################################################
