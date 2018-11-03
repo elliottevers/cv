@@ -34,7 +34,12 @@ def rnn_step_forward(x, prev_h, Wx, Wh, b):
     # hidden state and any values you need for the backward pass in the next_h   #
     # and cache variables respectively.                                          #
     ##############################################################################
-    pass
+    
+    score = np.matmul(x, Wx) + np.matmul(prev_h, Wh) + b
+    
+    next_h = np.tanh(score)
+
+    cache = (Wx, Wh, x, prev_h, score)
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
@@ -63,7 +68,97 @@ def rnn_step_backward(dnext_h, cache):
     # HINT: For the tanh function, you can compute the local derivative in terms #
     # of the output value from tanh.                                             #
     ##############################################################################
-    pass
+    
+    # https://theclevermachine.wordpress.com/2014/09/08/derivation-derivatives-for-common-neural-network-activation-functions/
+        
+    Wx, Wh, x, prev_h, score = cache
+    
+    score_x = np.matmul(x, Wx)
+    
+    score_h = np.matmul(prev_h, Wh)
+
+    d_tanh_d_score = lambda score: 1 - np.tanh(score)**2
+    
+    d_add_d_b = lambda b: b.shape
+    
+    d_add_d_score_h = lambda score_h: np.ones(score_h.shape)
+    
+    d_add_d_score_x = lambda score_x: np.ones(score_x.shape)
+    
+#     def d_mult_d_Wh(Wh):
+#         return np.matmul(dep, Wh)
+    
+#     def d_mult_d_h(h):
+#         return np.matmul(h, dep)
+    
+#     def d_mult_d_Wx(Wx):
+#         return np.matmul(dep, Wx)
+    
+#     def d_x():
+        
+#     def d_score_x():
+        
+#     def d_score():
+        
+    d_mult_d_x = lambda x: Wx
+        
+        
+#     d_multiplication_d_Wh = lambda Wh, h: h
+    
+#     d_multiplication_d_h = lambda h, Wh: Wh
+    
+#     d_multiplication_d_Wx = lambda x, Wx: x
+    
+#     d_multiplication_d_x = lambda x, Wx: Wx
+    
+    
+#     # modularized
+    
+#     d_score_x = 
+    
+#     d_score = 
+    
+#     d_x = 
+    
+    
+#     import ipdb; ipdb.set_trace()
+    
+#     dx = d_tanh_d_score(score) * \
+#         d_add_d_score_x(score_x).matmul(
+            
+#         )
+#         d_mult_d_x(x)
+
+    
+    dx_test = np.matmul(
+        dnext_h * d_tanh_d_score(score) * d_add_d_score_x(score_x),
+        d_mult_d_x(x).T
+    )
+    
+    
+    
+#     import ipdb; ipdb.set_trace()
+
+    dh_raw = (1 - np.tanh(score) ** 2) * dnext_h
+    
+    
+    dx = np.dot(dh_raw, Wx.T)
+    
+    import ipdb; ipdb.set_trace()
+
+    dprev_h = np.dot(dh_raw, Wh.T)
+    dWx = np.dot(x.T, dh_raw)
+    dWh = np.dot(prev_h.T, dh_raw)
+    db = np.sum(dh_raw, axis=0)
+    
+    import ipdb; ipdb.set_trace()
+#     dh_raw = (1 - np.tanh(h_raw) ** 2) * dnext_h
+#     dx = np.dot(dh_raw, Wx.T)
+#     dprev_h = np.dot(dh_raw, Wh.T)
+#     dWx = np.dot(x.T, dh_raw)
+#     dWh = np.dot(prev_h.T, dh_raw)
+#     db = np.sum(dh_raw, axis=0)
+    
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
