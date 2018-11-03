@@ -69,9 +69,12 @@ def rnn_step_backward(dnext_h, cache):
     # of the output value from tanh.                                             #
     ##############################################################################
     
+    # derivative of hyperbolic tangent
     # https://theclevermachine.wordpress.com/2014/09/08/derivation-derivatives-for-common-neural-network-activation-functions/
         
     Wx, Wh, x, prev_h, score = cache
+    
+    h = prev_h
     
     score_x = np.matmul(x, Wx)
     
@@ -79,85 +82,52 @@ def rnn_step_backward(dnext_h, cache):
 
     d_tanh_d_score = lambda score: 1 - np.tanh(score)**2
     
-    d_add_d_b = lambda b: b.shape
+    
+    d_add_d_b = lambda b: np.ones(b.shape)
     
     d_add_d_score_h = lambda score_h: np.ones(score_h.shape)
     
     d_add_d_score_x = lambda score_x: np.ones(score_x.shape)
     
-#     def d_mult_d_Wh(Wh):
-#         return np.matmul(dep, Wh)
-    
-#     def d_mult_d_h(h):
-#         return np.matmul(h, dep)
-    
-#     def d_mult_d_Wx(Wx):
-#         return np.matmul(dep, Wx)
-    
-#     def d_x():
-        
-#     def d_score_x():
-        
-#     def d_score():
+
         
     d_mult_d_x = lambda x: Wx
-        
-        
-#     d_multiplication_d_Wh = lambda Wh, h: h
     
-#     d_multiplication_d_h = lambda h, Wh: Wh
-    
-#     d_multiplication_d_Wx = lambda x, Wx: x
-    
-#     d_multiplication_d_x = lambda x, Wx: Wx
+    d_mult_d_Wx = lambda Wx: x
     
     
-#     # modularized
+    d_mult_d_h = lambda h: Wh
     
-#     d_score_x = 
-    
-#     d_score = 
-    
-#     d_x = 
-    
-    
-#     import ipdb; ipdb.set_trace()
-    
-#     dx = d_tanh_d_score(score) * \
-#         d_add_d_score_x(score_x).matmul(
-            
-#         )
-#         d_mult_d_x(x)
+    d_mult_d_Wh = lambda Wh: h
 
     
-    dx_test = np.matmul(
+    dx = np.matmul(
         dnext_h * d_tanh_d_score(score) * d_add_d_score_x(score_x),
         d_mult_d_x(x).T
     )
     
+    dWx = np.matmul(
+        x.T,
+        dnext_h * d_tanh_d_score(score) * d_add_d_score_x(score_x)
+    )
     
     
-#     import ipdb; ipdb.set_trace()
-
-    dh_raw = (1 - np.tanh(score) ** 2) * dnext_h
+    dh = np.matmul(
+        dnext_h * d_tanh_d_score(score) * d_add_d_score_h(score_h),
+        d_mult_d_h(h).T
+    )
     
+    dWh = np.matmul(
+        h.T,
+        dnext_h * d_tanh_d_score(score) * d_add_d_score_h(score_h)
+    )
     
-    dx = np.dot(dh_raw, Wx.T)
+    db = np.sum(
+        dnext_h * d_tanh_d_score(score) * d_add_d_score_h(score_h),
+        axis=0
+    )
     
-    import ipdb; ipdb.set_trace()
-
-    dprev_h = np.dot(dh_raw, Wh.T)
-    dWx = np.dot(x.T, dh_raw)
-    dWh = np.dot(prev_h.T, dh_raw)
-    db = np.sum(dh_raw, axis=0)
-    
-    import ipdb; ipdb.set_trace()
-#     dh_raw = (1 - np.tanh(h_raw) ** 2) * dnext_h
-#     dx = np.dot(dh_raw, Wx.T)
-#     dprev_h = np.dot(dh_raw, Wh.T)
-#     dWx = np.dot(x.T, dh_raw)
-#     dWh = np.dot(prev_h.T, dh_raw)
-#     db = np.sum(dh_raw, axis=0)
+    dprev_h = dh
     
     ##############################################################################
     #                               END OF YOUR CODE                             #
@@ -189,7 +159,31 @@ def rnn_forward(x, h0, Wx, Wh, b):
     # input data. You should use the rnn_step_forward function that you defined  #
     # above. You can use a for loop to help compute the forward pass.            #
     ##############################################################################
-    pass
+    N, T, D = x.shape
+
+    H = Wh.shape[0]
+    
+    h = np.zeros(
+        (N, T, H)
+    )
+
+    cache_cache = []
+
+    current_h = h0
+    
+    for t in range(T):
+        current_h, cache_next = rnn_step_forward(
+            x[:, t, :],
+            current_h,
+            Wx,
+            Wh,
+            b
+        )
+        h[:, t, :] = current_h
+
+        cache_cache.append(cache_next)
+            
+    cache = (h0, cache_cache, N, T, D, H)
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
@@ -216,7 +210,38 @@ def rnn_backward(dh, cache):
     # sequence of data. You should use the rnn_step_backward function that you   #
     # defined above. You can use a for loop to help compute the backward pass.   #
     ##############################################################################
-    pass
+        
+    h0, cache_cache, N, T, D, H = cache
+    
+    dx = np.zeros([N, T, D])
+    
+    dWx = np.zeros([D, H])
+    
+    dWh = np.zeros([H, H])
+    
+    db = np.zeros([H])
+    
+    dprev_h = 0 # current_state
+    
+    for t in reversed(range(T)):
+        dh_upstream = dh[:, t, :] + dprev_h
+        
+        dx_prev, dprev_h, dWx_prev, dWh_prev, db_prev = rnn_step_backward(
+            dh_upstream,
+            cache_cache[t]
+        )
+        
+        dWx += dWx_prev
+        
+        dWh += dWh_prev
+        
+        db += db_prev
+        
+        dx[:, t, :] = dx_prev
+
+    dh0 = dprev_h
+
+    
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
