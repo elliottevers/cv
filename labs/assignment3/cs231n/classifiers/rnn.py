@@ -109,6 +109,7 @@ class CaptioningRNN(object):
         # Word embedding matrix
         W_embed = self.params['W_embed']
 
+        # RNN params
         # Input-to-hidden, hidden-to-hidden, and biases for the RNN
         Wx, Wh, b = self.params['Wx'], self.params['Wh'], self.params['b']
 
@@ -137,7 +138,86 @@ class CaptioningRNN(object):
         # defined above to store loss and gradients; grads[k] should give the      #
         # gradients for self.params[k].                                            #
         ############################################################################
-        pass
+        
+        '''
+        We compute the first hidden state.  It has condensed information about the image in 'features'.  The gradient can flow back to W_proj and b_proj as to make them learnable. 
+        '''
+        h0, cache_affine = affine_forward(
+            features,
+            W_proj, 
+            b_proj
+        )
+        
+        '''
+        Compute the word embeddings (512 D) for each of the words in the vocab (1004 D).  The "embedder" W_embed is learnable.
+        '''
+        embedded_captions_in, cache_embed_in = word_embedding_forward(
+            captions_in,
+            W_embed
+        )
+        
+        
+        network_forward_temporal = {
+            'lstm': lstm_forward,
+            'rnn': rnn_forward
+        }[self.cell_type]
+        
+        '''
+        Compute all the hidden states.  We need these to compute the score over the vocabulary at each timestep, for which we will then compute the cross entropy.
+        '''
+        h, cache_rnn = network_forward_temporal(
+            embedded_captions_in,
+            h0,
+            Wx,
+            Wh,
+            b
+        )
+        
+        '''
+        Per above, compute the score for each hidden state for the entire vocabulary.  The transformation is learnable.
+        '''
+        y_hat, cache_temporal = temporal_affine_forward(
+            h,
+            W_vocab,
+            b_vocab
+        )
+        
+        '''
+        Compute softmax loss - ignore some of the tokens specified by "mask"
+        '''
+        loss, dout = temporal_softmax_loss(
+            y_hat,
+            captions_out, # gt
+            mask
+        )
+
+        # let gradient flow back to learnable parameters
+        
+        dout, grads['W_vocab'], grads['b_vocab'] = temporal_affine_backward(
+            dout,
+            cache_temporal
+        )
+        
+        network_backward_temporal = {
+            'lstm': lstm_backward,
+            'rnn': rnn_backward
+        }[self.cell_type]
+        
+        dout, dh0, grads['Wx'], grads['Wh'], grads['b'] = network_backward_temporal(
+            dout,
+            cache_rnn
+        )
+        
+        grads['W_embed'] = word_embedding_backward(
+            dout,
+            cache_embed_in
+        )
+        
+        _, grads['W_proj'], grads['b_proj'] = affine_backward(
+            dh0,
+            cache_affine
+        )
+        
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
@@ -199,7 +279,41 @@ class CaptioningRNN(object):
         # functions; you'll need to call rnn_step_forward or lstm_step_forward in #
         # a loop.                                                                 #
         ###########################################################################
-        pass
+        
+#         import ipdb; ipdb.set_trace()
+        
+        # first hidden state
+        h0 = np.matmul(features, W_proj) + b_proj
+                
+        # first input to RNN
+        x = W_embed[
+            (self._start * np.ones(N)).astype(np.int32),
+            :
+        ]
+
+        forward_step = {
+            'lstm': lstm_step_forward,
+            'rnn': rnn_step_forward
+        }[self.cell_type]
+
+        h = h0
+                
+        for t in range(max_length):
+            # next hidden state
+            h, _ = forward_step(x, h, Wx, Wh, b)
+            
+            # scores for entire vocabulary
+            y = np.matmul(h, W_vocab) + b_vocab
+            
+            # word with highest score
+            captions[:, t] = np.argmax(
+                y,
+                axis=1
+            )
+            
+            # next input to RNN - an embedding
+            x = W_embed[captions[:, t], :]
+            
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
