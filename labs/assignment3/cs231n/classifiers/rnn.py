@@ -279,9 +279,7 @@ class CaptioningRNN(object):
         # functions; you'll need to call rnn_step_forward or lstm_step_forward in #
         # a loop.                                                                 #
         ###########################################################################
-        
-#         import ipdb; ipdb.set_trace()
-        
+                
         # first hidden state
         h0 = np.matmul(features, W_proj) + b_proj
                 
@@ -297,10 +295,16 @@ class CaptioningRNN(object):
         }[self.cell_type]
 
         h = h0
-                
+        c = 0
         for t in range(max_length):
+            
             # next hidden state
-            h, _ = forward_step(x, h, Wx, Wh, b)
+            if self.cell_type == 'lstm':
+                h, c, _ = forward_step(x, h, c, Wx, Wh, b)
+            elif self.cell_type == 'rnn':
+                h, _ = forward_step(x, h, Wx, Wh, b)
+            else:
+                raise('type of step not specified')
             
             # scores for entire vocabulary
             y = np.matmul(h, W_vocab) + b_vocab
